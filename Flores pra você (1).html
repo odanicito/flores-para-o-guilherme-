@@ -1,0 +1,318 @@
+<title>Flores para você, Gui</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&family=DM+Sans:wght@400&display=swap">
+<style>
+  /* Layout: a tela inteira é um jardim noturno; título no alto, dica embaixo, flores nascem do chão. */
+  :root {
+    --night-top: #0d1030;
+    --night-mid: #1a1446;
+    --night-low: #3a1c52;
+    --ground: #0a0a1c;
+    --petal-glow: #ffd6e0;
+    --text: #fbe9ef;
+    --text-soft: #c9b8d6;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--night-top);
+    background-image: linear-gradient(180deg, var(--night-top) 0%, var(--night-mid) 55%, var(--night-low) 100%);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #c {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: manipulation;
+  }
+  .top, .bottom {
+    position: fixed;
+    left: 0;
+    right: 0;
+    text-align: center;
+    pointer-events: none;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .top { top: calc(env(safe-area-inset-top, 0px) + 7vh); }
+  .bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); }
+  h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(2.2rem, 9vw, 3.6rem);
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+    color: var(--text);
+    text-shadow: 0 0 24px rgba(255, 143, 163, 0.35);
+    opacity: 0;
+    animation: rise 2.4s ease 0.6s forwards;
+  }
+  .sub {
+    margin: 10px 0 0;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    color: var(--text-soft);
+    opacity: 0;
+    animation: rise 2.4s ease 1.4s forwards;
+  }
+  .hint {
+    margin: 0;
+    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    opacity: 0;
+    animation: rise 2s ease 5s forwards;
+    transition: opacity 0.8s ease;
+  }
+  .hint.gone { opacity: 0 !important; animation: none; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    h1, .sub, .hint { animation: none; opacity: 1; }
+  }
+</style>
+
+<canvas id="c" aria-label="Jardim de flores"></canvas>
+<div class="top">
+  <h1>Flores para você, Gui</h1>
+</div>
+<div class="bottom"><p class="hint" id="hint">Toque na tela para plantar uma flor</p></div>
+
+<script>
+(function () {
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var hint = document.getElementById('hint');
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W = 0, H = 0, dpr = 1, groundY = 0;
+
+  var PETALS = ['#ff8fa3', '#ffb3c1', '#ffd6a5', '#cdb4ff', '#ffe28a', '#ff7b9c', '#a0c4ff', '#ffc2e2'];
+  var CENTERS = ['#ffd166', '#fff1b8', '#ffb74d'];
+  var flowers = [];
+  var MAX = 90;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    groundY = H * 0.94;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+
+  function addFlower(nx, nh, delay, instant) {
+    if (flowers.length >= MAX) flowers.shift();
+    var now = performance.now();
+    flowers.push({
+      nx: nx,
+      nh: nh,
+      lean: rnd(-0.06, 0.06),
+      size: rnd(0.065, 0.1),
+      t0: now + delay - (instant ? 99999 : 0),
+      dur: rnd(3200, 4200),
+      phase: rnd(0, 6.28),
+      color: pick(PETALS),
+      center: pick(CENTERS),
+      n: Math.floor(rnd(5, 9)),
+      spin: rnd(0, 6.28)
+    });
+  }
+
+  // Jardim inicial: flores espalhadas, nascendo uma depois da outra.
+  var seeds = [0.16, 0.84, 0.5, 0.3, 0.7, 0.08, 0.92, 0.4, 0.6, 0.22, 0.78, 0.5];
+  var heights = [0.36, 0.34, 0.5, 0.44, 0.42, 0.26, 0.28, 0.3, 0.33, 0.52, 0.48, 0.24];
+  for (var i = 0; i < seeds.length; i++) {
+    addFlower(seeds[i] + rnd(-0.03, 0.03), heights[i] + rnd(-0.03, 0.03), 400 + i * 520, reduce);
+  }
+
+  // Vagalumes e estrelas
+  var flies = [];
+  for (var f = 0; f < 26; f++) {
+    flies.push({ x: Math.random(), y: rnd(0.35, 0.95), vx: rnd(-0.00002, 0.00002), vy: rnd(-0.00002, 0.00002), ph: rnd(0, 6.28), s: rnd(0.8, 1.8) });
+  }
+  var stars = [];
+  for (var s = 0; s < 70; s++) {
+    stars.push({ x: Math.random(), y: Math.random() * 0.55, r: rnd(0.4, 1.2), ph: rnd(0, 6.28) });
+  }
+
+  function stemPoint(t, x0, y0, cx, cy, x1, y1) {
+    var u = 1 - t;
+    return {
+      x: u * u * x0 + 2 * u * t * cx + t * t * x1,
+      y: u * u * y0 + 2 * u * t * cy + t * t * y1
+    };
+  }
+
+  function drawLeaf(px, py, len, angle, grow) {
+    var L = len * grow;
+    if (L < 1) return;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(L * 0.5, -L * 0.38, L, 0);
+    ctx.quadraticCurveTo(L * 0.5, L * 0.3, 0, 0);
+    ctx.fillStyle = '#2f9e6f';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawFlower(fl, now, time) {
+    var p = clamp((now - fl.t0) / fl.dur, 0, 1);
+    if (p <= 0) return;
+    var g = easeOut(clamp(p / 0.65, 0, 1));
+    var b = p < 0.6 ? 0 : smooth(clamp((p - 0.6) / 0.4, 0, 1));
+    var x0 = fl.nx * W, y0 = groundY + 4;
+    var h = fl.nh * H;
+    var base = Math.min(W, H);
+    var lean = fl.lean * W;
+    var sway = reduce ? 0 : Math.sin(time * 0.0012 + fl.phase) * 7 * g;
+    var x1 = x0 + lean + sway, y1 = y0 - h;
+    var cx = x0 - lean * 0.5, cy = y0 - h * 0.55;
+
+    // caule
+    ctx.beginPath();
+    var steps = 28;
+    ctx.moveTo(x0, y0);
+    for (var i = 1; i <= steps; i++) {
+      var pt = stemPoint(g * i / steps, x0, y0, cx, cy, x1, y1);
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.strokeStyle = '#2a8a62';
+    ctx.lineWidth = Math.max(2, base * 0.008);
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // folhas
+    var lp1 = stemPoint(0.3, x0, y0, cx, cy, x1, y1);
+    var lp2 = stemPoint(0.55, x0, y0, cx, cy, x1, y1);
+    drawLeaf(lp1.x, lp1.y, base * 0.07, -0.5 - 0.3, clamp((g - 0.3) / 0.25, 0, 1));
+    drawLeaf(lp2.x, lp2.y, base * 0.06, Math.PI + 0.5 + 0.3, clamp((g - 0.55) / 0.25, 0, 1));
+
+    // cabeça
+    var tip = stemPoint(g, x0, y0, cx, cy, x1, y1);
+    var r = base * fl.size;
+    var tilt = sway / 60;
+
+    if (b <= 0) {
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, Math.max(1.5, r * 0.22 * g), 0, 6.283);
+      ctx.fillStyle = fl.color;
+      ctx.fill();
+      return;
+    }
+
+    // brilho suave
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, r * 1.5 * b, 0, 6.283);
+    ctx.fillStyle = 'rgba(255, 190, 215, 0.10)';
+    ctx.fill();
+
+    for (var k = 0; k < fl.n; k++) {
+      var a = k / fl.n * 6.283 + fl.spin * (1 - b) + tilt;
+      ctx.save();
+      ctx.translate(tip.x, tip.y);
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.58 * b, r * 0.34 * b, r * 0.58 * b, 0, 0, 6.283);
+      ctx.fillStyle = fl.color;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.5 * b, r * 0.16 * b, r * 0.34 * b, 0, 0, 6.283);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, r * 0.22 * b, 0, 6.283);
+    ctx.fillStyle = fl.center;
+    ctx.fill();
+  }
+
+  function frame(now) {
+    var time = now;
+    ctx.clearRect(0, 0, W, H);
+
+    // estrelas
+    for (var s = 0; s < stars.length; s++) {
+      var st = stars[s];
+      var tw = reduce ? 0.7 : 0.5 + 0.5 * Math.sin(time * 0.0009 + st.ph);
+      ctx.globalAlpha = 0.25 + 0.55 * tw;
+      ctx.beginPath();
+      ctx.arc(st.x * W, st.y * H, st.r, 0, 6.283);
+      ctx.fillStyle = '#fff4f8';
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // chão
+    var gg = ctx.createLinearGradient(0, groundY - 10, 0, H);
+    gg.addColorStop(0, 'rgba(10,10,28,0)');
+    gg.addColorStop(0.25, '#0a0a1c');
+    gg.addColorStop(1, '#0a0a1c');
+    ctx.fillStyle = gg;
+    ctx.fillRect(0, groundY - 10, W, H - groundY + 10);
+
+    // flores (as mais altas atrás)
+    var order = flowers.slice().sort(function (a, b) { return b.nh - a.nh; });
+    for (var i = 0; i < order.length; i++) drawFlower(order[i], now, time);
+
+    // vagalumes
+    for (var j = 0; j < flies.length; j++) {
+      var fl = flies[j];
+      if (!reduce) {
+        fl.x += fl.vx * 16 + Math.sin(time * 0.0004 + fl.ph) * 0.0001;
+        fl.y += fl.vy * 16 + Math.cos(time * 0.0005 + fl.ph) * 0.00008;
+        if (fl.x < 0) fl.x = 1; if (fl.x > 1) fl.x = 0;
+        if (fl.y < 0.3) fl.y = 0.95; if (fl.y > 0.97) fl.y = 0.35;
+      }
+      var al = reduce ? 0.7 : 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time * 0.002 + fl.ph));
+      ctx.beginPath();
+      ctx.arc(fl.x * W, fl.y * H, 7 * fl.s, 0, 6.283);
+      ctx.fillStyle = 'rgba(255, 226, 138, ' + (al * 0.14) + ')';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(fl.x * W, fl.y * H, 1.6 * fl.s, 0, 6.283);
+      ctx.fillStyle = 'rgba(255, 240, 180, ' + al + ')';
+      ctx.fill();
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // Toque: a flor nasce do chão e a cabeça termina onde o dedo tocou.
+  var hinted = false;
+  cv.addEventListener('pointerdown', function (e) {
+    var h = clamp((groundY - e.clientY) / H, 0.12, 0.8);
+    addFlower(e.clientX / W, h, 0, reduce);
+    if (!hinted) { hinted = true; hint.classList.add('gone'); }
+  });
+})();
+</script>
